@@ -1,74 +1,84 @@
 // Librerías WiFi
 #include <WiFi.h>
 #include <WiFiManager.h>
-#include <HTTPClient.h>
+
+// Librería MQTT
+#include <PubSubClient.h>
 
 // Librerías sensor
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-// Inicializaciones
-
-OneWire ourWire(18);  // GPIO18 - D9
+// Pines y objetos
+OneWire ourWire(18);  // GPIO18
 DallasTemperature sensors(&ourWire);
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+// Configuración MQTT
+const char* mqtt_server = "broker.hivemq.com";
+const int mqtt_port = 1883;
+const char* topic = "pepe/esp32/temperatura";
+
+// Temporizador
 unsigned long lastRequest = 0;
 const unsigned long requestInterval = 3000;
 
+void reconnectMQTT() {
+  // Reconectar si es necesario
+  while (!client.connected()) {
+    Serial.print("🔄 Intentando conectar al broker MQTT...");
+    String clientId = "ESP32Client-" + String(random(0xffff), HEX);
+    if (client.connect(clientId.c_str())) {
+      Serial.println("✅ Conectado al broker MQTT");
+    } else {
+      Serial.print("❌ fallo, rc=");
+      Serial.print(client.state());
+      Serial.println(" intentando de nuevo en 5 segundos");
+      delay(5000);
+    }
+  }
+}
+
 void setup() {
-
-  // Inicialización de WiFiManager
-  WiFiManager wm;
-  wm.resetSettings();
-
-  // Inicialización de Serial y librería sensors
+  // Serial y sensor
   Serial.begin(115200);
   sensors.begin();
 
-  // En caso de no lograrse la conexión automática, se crea el Access Point del ARDUINO
-  if(!wm.autoConnect("ESP32_AP","hola1234")) {
-    Serial.println("❌ No se pudo conectar, reiniciando");
+  // WiFiManager
+  WiFiManager wm;
+  wm.resetSettings();
+  if (!wm.autoConnect("ESP32_AP", "hola1234")) {
+    Serial.println("❌ No se pudo conectar, reiniciando...");
     ESP.restart();
   }
 
   Serial.println("✅ Conectado a WiFi");
-  
+
+  // MQTT setup
+  client.setServer(mqtt_server, mqtt_port);
 }
- 
+
 void loop() {
+  if (!client.connected()) {
+    reconnectMQTT();
+  }
+  client.loop();
 
   if (millis() - lastRequest >= requestInterval) {
-    
     lastRequest = millis();
 
     sensors.requestTemperatures();
     float temp = sensors.getTempCByIndex(0);
 
-    if(WiFi.status() == WL_CONNECTED) {
-      HTTPClient http;
+    String payload = "{\"degrees\":" + String(temp, 2) + ",\"source\":\"ESP32 DS18B20\"}";
 
-      String serverUrl = "http://192.168.101.88:3000/temperatures";
-
-      http.begin(serverUrl);
-
-      http.addHeader("Content-Type","application/json");
-
-      String payload = "{\"degrees\":" + String(temp, 2) + ",\"source\":\"ESP32 DS18B20\"}";
-
-      int httpCode = http.POST(payload);
-
-      if (httpCode > 0) {
-        Serial.print("📨 POST enviado. Código: ");
-        Serial.println(httpCode);
-        Serial.println("Respuesta:");
-        Serial.println(http.getString());
-      } else {
-        Serial.print("❌ Error en POST: ");
-        Serial.println(http.errorToString(httpCode).c_str());
-      }
-
-      http.end();
+    // Publicar el dato en el topic
+    if (client.publish(topic, payload.c_str())) {
+      Serial.print("📡 Publicado en MQTT: ");
+      Serial.println(payload);
     } else {
-      Serial.println("WiFi desconectado!");
+      Serial.println("❌ Error al publicar en MQTT");
     }
   }
 }
