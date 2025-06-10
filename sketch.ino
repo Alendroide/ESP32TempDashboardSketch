@@ -9,9 +9,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 
-// Pines para el sensor MQ135
-const int mq135Pin = 1;  // GPIO1 (A0) para el MQ135
-const int ds18b20Pin = 18; // GPIO18 (D9) para el DS18B20
+#define mq135Pin A3
+#define ds18b20Pin 18
 
 // Pines y objetos
 OneWire ourWire(ds18b20Pin);
@@ -52,7 +51,7 @@ void setup() {
 
   // WiFiManager
   WiFiManager wm;
-  wm.resetSettings();
+  //wm.resetSettings();
   if (!wm.autoConnect("ESP32_AP", "hola1234")) {
     Serial.println("❌ No se pudo conectar, reiniciando...");
     ESP.restart();
@@ -63,6 +62,9 @@ void setup() {
   // MQTT setup
   client.setServer(mqtt_server, mqtt_port);
 }
+
+
+
 
 void loop() {
   if (!client.connected()) {
@@ -77,9 +79,12 @@ void loop() {
     sensors.requestTemperatures();
     float temp = sensors.getTempCByIndex(0);
 
+
     // Leer valor MQ135
     int mq135Value = analogRead(mq135Pin);  // Lee el valor analógico
-    float airQuality = mq135Value * (3.1 / 4095.0);  // Convertir a voltaje (0-3.1V)
+    float airQuality = mq135Value;  // Convertir a voltaje (0-3.1V)
+
+
 
     // Preparar los datos a enviar
     String tempPayload = "{\"degrees\":" + String(temp, 2) + ",\"source\":\"ESP32 DS18B20\"}";
