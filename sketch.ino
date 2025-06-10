@@ -51,7 +51,7 @@ void setup() {
 
   // WiFiManager
   WiFiManager wm;
-  //wm.resetSettings();
+  wm.resetSettings();
   if (!wm.autoConnect("ESP32_AP", "hola1234")) {
     Serial.println("❌ No se pudo conectar, reiniciando...");
     ESP.restart();
