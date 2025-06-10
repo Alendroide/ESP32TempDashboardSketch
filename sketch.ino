@@ -81,9 +81,9 @@ void loop() {
 
 
     // Leer valor MQ135
-    int mq135Value = analogRead(mq135Pin);  // Lee el valor analógico
-    float airQuality = mq135Value;  // Convertir a voltaje (0-3.1V)
-
+    int mq135Value = analogRead(mq135Pin);
+    float normal = mq135Value / 3.3;
+    float airQuality = normal * 0.925;
 
 
     // Preparar los datos a enviar
