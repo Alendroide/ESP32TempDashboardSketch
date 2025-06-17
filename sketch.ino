@@ -12,6 +12,9 @@
 #define mq135Pin A3
 #define ds18b20Pin 18
 
+#define ledTemp D5
+#define ledGas D6
+
 // Pines y objetos
 OneWire ourWire(ds18b20Pin);
 DallasTemperature sensors(&ourWire);
@@ -27,6 +30,11 @@ const char* topic_air = "pepe/esp32/aire";
 // Temporizador
 unsigned long lastRequest = 0;
 const unsigned long requestInterval = 3000;
+
+
+// Max Temp & Gas
+const int maxTemp = 30;
+const int maxGas = 462;
 
 void reconnectMQTT() {
   // Reconectar si es necesario
@@ -44,7 +52,31 @@ void reconnectMQTT() {
   }
 }
 
+void handleMaxTemp() {
+  for(int i = 0; i < 10; i++){
+    digitalWrite(ledTemp, HIGH);
+    delay(100);
+    digitalWrite(ledTemp, LOW);
+    delay(100);
+  }
+}
+
+void handleMaxGas() {
+    for(int i = 0; i < 10; i++){
+    digitalWrite(ledGas, HIGH);
+    delay(100);
+    digitalWrite(ledGas, LOW);
+    delay(100);
+  }
+}
+
 void setup() {
+
+  // LEDS
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(ledTemp, OUTPUT);
+  pinMode(ledGas, OUTPUT);
+
   // Serial y sensor
   Serial.begin(115200);
   sensors.begin();
@@ -78,13 +110,13 @@ void loop() {
     // Leer temperatura DS18B20
     sensors.requestTemperatures();
     float temp = sensors.getTempCByIndex(0);
-
+    if(temp > maxTemp) handleMaxTemp();
 
     // Leer valor MQ135
     int mq135Value = analogRead(mq135Pin);
     float normal = mq135Value / 3.3;
     float airQuality = normal * 0.925;
-
+    if(airQuality > maxGas) handleMaxGas();
 
     // Preparar los datos a enviar
     String tempPayload = "{\"degrees\":" + String(temp, 2) + ",\"source\":\"ESP32 DS18B20\"}";
@@ -105,5 +137,9 @@ void loop() {
     } else {
       Serial.println("❌ Error al publicar calidad de aire en MQTT");
     }
+
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(20);
+    digitalWrite(LED_BUILTIN, LOW);
   }
 }
